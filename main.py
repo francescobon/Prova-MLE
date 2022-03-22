@@ -15,28 +15,86 @@ Esempio 85.04 di transcribe = 85040 di rekognition
 
 
 from keybert import KeyBERT
-import json
+import pandas as pd
 
+'''Estrae dalla trascrizione presente nel file le cinque parole più usate nel contesto'''
+def ex1 (transcription_df):
 
-def prova_mle():
-    # Opening JSON file
-    json_file = open('transcription.json')
-    # Load json file
-    json_dictionary = json.load(json_file)
     # Get transcript
-    transcript = json_dictionary['results']['transcripts'][0]['transcript']
-    print(transcript)
+    transcript = transcription_df.loc['transcripts','results'][0]['transcript']
+    # print(transcript)
 
     # Get KeyBERT model, I choose paraphrase-multilingual-MiniLM-L12-v2 for multi-lingual documents (also italian)
     kw_model = KeyBERT(model='paraphrase-multilingual-MiniLM-L12-v2')
     # Extract 5 keywords by using KeyBERT model
     keywords = kw_model.extract_keywords(transcript)
-    print('The most used keywords:\n', keywords)
+
+    return keywords
 
 
+'''Stampa le 5 parole, i tempi in cui vengono dette, e le corrispondenti emozioni trovate
+sul file rekognition'''
+def ex2(keywords, transcription_df, rekognition_df):
 
-    # Closing JSON file
-    json_file.close()
+    print("-- The words, times and emotions --\n")
+
+    results = transcription_df.loc['items','results']
+
+    # Search keywords in transcription results in order to get times and emotions from rekognition
+    for (key, conf) in keywords:
+
+        # Search the times and content in transcription
+        for r in results:
+            # Search if keys exist
+            if 'start_time' in r and 'end_time' in r and 'alternatives' in r:
+                start_time = float(r['start_time']) * 1000
+                end_time = float(r['end_time']) * 1000
+                content = r['alternatives'][0]['content'] #word to search
+
+                # if the word is found then search in rekognition the times and emotions
+                if content == key:
+                    #print("is equal:", content)
+
+                    #Search in rekognition the emotions and times
+                    for index in range(len(rekognition_df)):
+                        emotions = rekognition_df.loc[index, 'Face']['Emotions']
+                        timestamp = rekognition_df.loc[index, 'Timestamp']
+
+                        # time has to be contained in start and end times
+                        if timestamp >= start_time and timestamp <= end_time:
+
+                            #Print word, time, emotions
+                            print ("Word:", content)
+                            print ("Timestamp (ms):", timestamp)
+                            print ("Start Time (ms):", start_time)
+                            print ("End Time (ms):", end_time)
+                            print ("Emotions:", [em['Type'] for em in emotions])
+                            print ("\n---------\n")
+
+def prova_mle():
+
+    # Load json file
+    transcription_json = pd.read_json('transcription.json')
+    # print(json_dictionary)
+    # Open Data Frame from json file
+    transcription_df = pd.DataFrame(transcription_json)
+
+    print ('---- Exercise 1 ----\n\n')
+    keywords = ex1(transcription_df)
+    print('The most used keywords:\n', [k for (k, c) in keywords])
+    print ('\n--------------------\n\n\n')
+
+    print ('---- Exercise 2 ----\n\n')
+    # Load json file
+    rekognition_json = pd.read_json('rekognition.json')
+    # print(json_dictionary)
+    # Open Data Frame from json file
+    rekognition_df = pd.DataFrame(rekognition_json)
+
+    ex2(keywords, transcription_df, rekognition_df)
+    print ('\n--------------------\n\n\n')
+
+
 
 
 if __name__ == "__main__":
